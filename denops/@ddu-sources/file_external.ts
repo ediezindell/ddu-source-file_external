@@ -1,8 +1,8 @@
 import {
   type Item,
   type SourceOptions,
-} from "jsr:@shougo/ddu-vim@~6.1.0/types";
-import { BaseSource } from "jsr:@shougo/ddu-vim@~6.1.0/source";
+} from "jsr:@shougo/ddu-vim@~9.1.0/types";
+import { BaseSource } from "jsr:@shougo/ddu-vim@~9.1.0/source";
 import { type ActionData } from "jsr:@shougo/ddu-kind-file@~0.9.0";
 
 import type { Denops } from "jsr:@denops/core@~7.0.0";
@@ -47,7 +47,7 @@ async function tryGetStat(path: string): Promise<Deno.FileInfo | null> {
 }
 
 export class Source extends BaseSource<Params> {
-  kind = "file";
+  override kind = "file";
 
   gather(args: {
     denops: Denops;
@@ -58,13 +58,13 @@ export class Source extends BaseSource<Params> {
     const { denops, sourceOptions, sourceParams } = args;
     return new ReadableStream({
       async start(controller) {
-        let root = await fn.fnamemodify(
+        let root = (await fn.fnamemodify(
           denops,
           sourceOptions.path,
           ":p",
-        ) as string;
+        )) as string;
         if (root == "") {
-          root = await fn.getcwd(denops) as string;
+          root = (await fn.getcwd(denops)) as string;
         }
 
         if (!args.sourceParams.cmd.length) {
@@ -76,27 +76,22 @@ export class Source extends BaseSource<Params> {
         let enqueueSize = enqueueSize1st;
         let numChunks = 0;
 
-        const proc = new Deno.Command(
-          sourceParams.cmd[0],
-          {
-            args: sourceParams.cmd.slice(1),
-            stdout: "piped",
-            stderr: "piped",
-            cwd: root,
-          },
-        ).spawn();
+        const proc = new Deno.Command(sourceParams.cmd[0], {
+          args: sourceParams.cmd.slice(1),
+          stdout: "piped",
+          stderr: "piped",
+          cwd: root,
+        }).spawn();
 
         if (!proc || proc.stdout === null) {
           controller.close();
           return;
         }
         try {
-          for await (
-            const line of abortable(
-              iterLine(proc.stdout),
-              abortController.signal,
-            )
-          ) {
+          for await (const line of abortable(
+            iterLine(proc.stdout),
+            abortController.signal,
+          )) {
             const path = line.trim();
             if (!path.length) continue;
 
@@ -141,12 +136,10 @@ export class Source extends BaseSource<Params> {
         } finally {
           const status = await proc.status;
           if (!status.success) {
-            for await (
-              const line of abortable(
-                iterLine(proc.stderr),
-                abortController.signal,
-              )
-            ) {
+            for await (const line of abortable(
+              iterLine(proc.stderr),
+              abortController.signal,
+            )) {
               console.error(line);
             }
           }
